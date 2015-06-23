@@ -116,9 +116,6 @@ if (needCreateDb):
                 needRead = True
         connection.commit()
 
-if not options.maxMoney:
-    parser.error('You need send the maxCartoletas')
-
 if options.minValorization is not None and options.maxValorization is not None and options.minValorization > options.maxValorization:
     parser.error('minValorization cannot be bigger than maxValorization')
 
@@ -168,15 +165,18 @@ spentMoney = 0.0
 spectedPoints = 0.0
 players = []
 for i in range(playersNeeded):
-    avaliableMoney = options.maxMoney - spentMoney
-    currentMaxMoneyForPlayer = avaliableMoney / float(playersNeeded - i)
+    maxMoneyRule = ""
+    if options.maxMoney is not None:
+        avaliableMoney = options.maxMoney - spentMoney if options.maxMoney is not None else 9999.9
+        currentMaxMoneyForPlayer = avaliableMoney / float(playersNeeded - i)
+        maxMoneyRule = " AND player.price <= " + str(currentMaxMoneyForPlayer)
     cursor.execute('''  SELECT player.id, player.price, player.name, player.position, player.club, projection.score
                         FROM player JOIN projection ON player.id = projection.id
-                        WHERE player.price <= {0} AND player.id NOT IN {1} AND player.position IN {2} {3} {4}
+                        WHERE player.id NOT IN {0} AND player.position IN {1} {2} {3} {4}
                         ORDER BY projection.score DESC;
-                        '''.format(str(currentMaxMoneyForPlayer), \
-                                    listToInSql([player[0] for player in players]), \
+                        '''.format(listToInSql([player[0] for player in players]), \
                                     listToInSql(allowedPositionsForAlreadySelectedPlayers(players)), \
+                                    maxMoneyRule, \
                                     "" if options.minValorization == None else " AND projection.valorization > " + str(options.minValorization), \
                                     "" if options.maxValorization == None else " AND projection.valorization < " + str(options.maxValorization)))
     player = cursor.fetchone()
@@ -194,7 +194,7 @@ printLine()
 for player in players:
     print u'| {:<10}| {:<20}| {:<20}| {:<7}|'.format(positions[int(player[3])], player[2].title(), player[4].title(), format(player[5], ".2f"))
 printLine()
-print "Spent Cartoletas: " + str(spentMoney)
+print "Spent Cartoletas: " + format(spentMoney, ".2f")
 print "Expected Points:  " + format(spectedPoints, ".2f")
 
 connection.commit()

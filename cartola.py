@@ -32,7 +32,7 @@ cursor = connection.cursor()
 if (needCreateDb):
     cursor.execute("CREATE TABLE IF NOT EXISTS score(id int, score real, game int)")
     cursor.execute("CREATE TABLE IF NOT EXISTS projection(id int, score real, valorization real, matches real)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS player(id int, name text, position int, price real, status int)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS player(id int, name text, position int, price real, status int, club text)")
     connection.commit()
 
     browser = Browser()
@@ -59,7 +59,8 @@ if (needCreateDb):
                                                             + player["apelido"].encode('utf-8').replace("'","''") + "', " \
                                                             + str(player["posicao"]["id"]) + ", " \
                                                             + str(player["preco"]) + ", " \
-                                                            + str(status[player["status"].encode('utf-8')]) + ");")
+                                                            + str(status[player["status"].encode('utf-8').strip()]) + ", '" \
+                                                            + str(player["clube"]["nome"].encode('utf-8').strip()) + "');")
             connection.commit()
 
     def triangular(matches):
@@ -163,7 +164,7 @@ players = []
 for i in range(playersNeeded):
     avaliableMoney = options.maxMoney - spentMoney
     currentMaxMoneyForPlayer = avaliableMoney / float(playersNeeded - i)
-    cursor.execute('''  SELECT player.id, player.price, player.name, player.position
+    cursor.execute('''  SELECT player.id, player.price, player.name, player.position, player.club
                         FROM player JOIN projection ON player.id = projection.id
                         WHERE player.price <= {0} AND player.id NOT IN {1} and player.position IN {2}
                         ORDER BY projection.score DESC;
@@ -175,8 +176,10 @@ for i in range(playersNeeded):
     players.append(player)
 players.sort(key = lambda player: player[3])
 
+print "{:<10}|{:<20}|{:<20}".format("Position", "Name", "Club")
+print "----------------------------------------------------"
 for player in players:
-    print positions[int(player[3])] + ": " + player[2].encode('utf8').strip()
+    print u'{:<10}|{:<20}|{:<20}'.format(positions[int(player[3])], player[2], player[4])
 print "Spent Money: " + str(spentMoney)
 
 connection.commit()

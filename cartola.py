@@ -7,12 +7,25 @@ from getpass import getpass
 from mechanize import Browser
 from optparse import OptionParser
 
+def parseOptionFormation(option, opt, value, parser):
+    setattr(parser.values, option.dest, [int(i) for i in value.split(',')])
+
 parser = OptionParser()
-parser.add_option("-u", "--user", dest="user", type="string", help="the cartola username")
-parser.add_option("-m", "--maxMoney", dest="maxMoney", type="float", help="the max money allowed to be spent")
+parser.add_option("-u", "--user", dest="user", type="string", help="the cartola username, e.g. -u ademar@mail.com")
+parser.add_option("-m", "--maxMoney", dest="maxMoney", type="float", help="the max money allowed to be spent, e.g. -m 100.0")
+parser.add_option("-f", "--formation", action="callback", type="string", help="the allowed formations, e.g. -f 442,433", callback=parseOptionFormation)
 (options, args) = parser.parse_args()
 
 needCreateDb = not isfile("cartola.db")
+password = None
+
+if needCreateDb:
+    if not options.user:
+        parser.error('You need send an user to load first database')
+    password = getpass("enter the password for user " + options.user + ": ")
+    if not password:
+        parser.error('You need informe your password to sign in')
+
 connection = connect("cartola.db")
 cursor = connection.cursor()
 
@@ -26,7 +39,7 @@ if (needCreateDb):
     browser.open("https://loginfree.globo.com/login/438")
     browser.select_form(nr=0)
     browser.form["login-passaporte"] = options.user
-    browser.form["senha-passaporte"] = getpass("enter the password for user " + options.user + ": ")
+    browser.form["senha-passaporte"] = password
     browser.submit()
 
     status = { "Nulo": 1, "D\xc3\xbavida": 2, "Contundido": 3, "Suspenso": 4, "Prov\xc3\xa1vel": 5 }
@@ -100,15 +113,24 @@ if (needCreateDb):
                 needRead = True
         connection.commit()
 
+if not options.maxMoney:
+    parser.error('You need send the maxMoney')
+
 playersNeeded = 12
 positions = { 1: "GOL", 2: "LAT", 3: "ZAG", 4: "MEI", 5: "ATA", 6: "TEC" }
-allowedFormations = [[1, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 6], \
-                        [1, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 6], \
-                        [1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5, 6], \
-                        [1, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6], \
-                        [1, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 6], \
-                        [1, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 6], \
-                        [1, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 6],]
+formations =  { 343 : [1, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 6], \
+                352 : [1, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 6], \
+                433 : [1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5, 6], \
+                442 : [1, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6], \
+                451 : [1, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 6], \
+                532 : [1, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 6], \
+                541 : [1, 2, 2, 3, 3, 3, 4, 4, 4, 4, 5, 6], }
+allowedFormations = []
+if (options.formation is None):
+    allowedFormations.extend(formations.values())
+else:
+    for f in options.formation:
+        allowedFormations.append(formations[f])
 
 def allowedPositionsForAlreadySelectedPlayers(players):
     positionsCount = { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 }

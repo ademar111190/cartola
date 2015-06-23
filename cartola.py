@@ -12,7 +12,9 @@ def parseOptionFormation(option, opt, value, parser):
 
 parser = OptionParser()
 parser.add_option("-u", "--user", dest="user", type="string", help="the cartola username, e.g. -u ademar@mail.com")
-parser.add_option("-m", "--maxMoney", dest="maxMoney", type="float", help="the max money allowed to be spent, e.g. -m 100.0")
+parser.add_option("-c", "--maxCartoletas", dest="maxMoney", type="float", help="the max money (cartoletas) allowed to be spent, e.g. -c 100.0")
+parser.add_option("-m", "--minValorization", dest="minValorization", type="float", help="the min valorization, e.g. -m -0.4")
+parser.add_option("-M", "--maxValorization", dest="maxValorization", type="float", help="the max valorization, e.g. -M 0.5")
 parser.add_option("-f", "--formation", action="callback", type="string", help="the allowed formations, e.g. -f 442,433", callback=parseOptionFormation)
 (options, args) = parser.parse_args()
 
@@ -115,7 +117,10 @@ if (needCreateDb):
         connection.commit()
 
 if not options.maxMoney:
-    parser.error('You need send the maxMoney')
+    parser.error('You need send the maxCartoletas')
+
+if options.minValorization is not None and options.maxValorization is not None and options.minValorization > options.maxValorization:
+    parser.error('minValorization cannot be bigger than maxValorization')
 
 playersNeeded = 12
 positions = { 1: "GOL", 2: "LAT", 3: "ZAG", 4: "MEI", 5: "ATA", 6: "TEC" }
@@ -153,34 +158,44 @@ def allowedPositionsForAlreadySelectedPlayers(players):
                 allowedPositions.append(key)
     return allowedPositions
 
-def listToNotInSql(list):
+def listToInSql(list):
     return str(list).replace("[","(").replace("]",")")
 
 connection = connect("cartola.db")
 cursor = connection.cursor()
 
 spentMoney = 0.0
+spectedPoints = 0.0
 players = []
 for i in range(playersNeeded):
     avaliableMoney = options.maxMoney - spentMoney
     currentMaxMoneyForPlayer = avaliableMoney / float(playersNeeded - i)
-    cursor.execute('''  SELECT player.id, player.price, player.name, player.position, player.club
+    cursor.execute('''  SELECT player.id, player.price, player.name, player.position, player.club, projection.score
                         FROM player JOIN projection ON player.id = projection.id
-                        WHERE player.price <= {0} AND player.id NOT IN {1} and player.position IN {2}
+                        WHERE player.price <= {0} AND player.id NOT IN {1} AND player.position IN {2} {3} {4}
                         ORDER BY projection.score DESC;
                         '''.format(str(currentMaxMoneyForPlayer), \
-                                    listToNotInSql([player[0] for player in players]), \
-                                    listToNotInSql(allowedPositionsForAlreadySelectedPlayers(players))))
+                                    listToInSql([player[0] for player in players]), \
+                                    listToInSql(allowedPositionsForAlreadySelectedPlayers(players)), \
+                                    "" if options.minValorization == None else " AND projection.valorization > " + str(options.minValorization), \
+                                    "" if options.maxValorization == None else " AND projection.valorization < " + str(options.maxValorization)))
     player = cursor.fetchone()
     spentMoney = spentMoney + float(player[1])
+    spectedPoints = spectedPoints + player[5]
     players.append(player)
 players.sort(key = lambda player: player[3])
 
-print "{:<10}|{:<20}|{:<20}".format("Position", "Name", "Club")
-print "----------------------------------------------------"
+def printLine():
+    print "+-----------+---------------------+---------------------+--------+"
+
+printLine()
+print "| {:<10}| {:<20}| {:<20}| {:<7}|".format("Position", "Name", "Club", "Points")
+printLine()
 for player in players:
-    print u'{:<10}|{:<20}|{:<20}'.format(positions[int(player[3])], player[2], player[4])
-print "Spent Money: " + str(spentMoney)
+    print u'| {:<10}| {:<20}| {:<20}| {:<7}|'.format(positions[int(player[3])], player[2].title(), player[4].title(), format(player[5], ".2f"))
+printLine()
+print "Spent Cartoletas: " + str(spentMoney)
+print "Expected Points:  " + format(spectedPoints, ".2f")
 
 connection.commit()
 connection.close()

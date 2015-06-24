@@ -92,7 +92,7 @@ if (needCreateDb):
             games = evolution["rodadas"]
             nextScore = makeProbableNextScore(averages)
             matches = len(averages)
-            valorization = 0.0 if matches == 0 else averages[-1:][0]
+            valorization = 0.0 if matches == 0 else nextScore - averages[-1:][0]
             cursor.execute("INSERT INTO projection VALUES (" + str(playerId) + ", " \
                                                                 + str(nextScore) + ", " \
                                                                 + str(valorization) + ", " \
@@ -170,7 +170,7 @@ for i in range(playersNeeded):
         avaliableMoney = options.maxMoney - spentMoney if options.maxMoney is not None else 9999.9
         currentMaxMoneyForPlayer = avaliableMoney / float(playersNeeded - i)
         maxMoneyRule = " AND player.price <= " + str(currentMaxMoneyForPlayer)
-    cursor.execute('''  SELECT player.id, player.price, player.name, player.position, player.club, projection.score
+    cursor.execute('''  SELECT player.id, player.price, player.name, player.position, player.club, projection.score, projection.valorization
                         FROM player JOIN projection ON player.id = projection.id
                         WHERE player.id NOT IN {0} AND player.position IN {1} {2} {3} {4}
                         ORDER BY projection.score DESC;
@@ -186,13 +186,13 @@ for i in range(playersNeeded):
 players.sort(key = lambda player: player[3])
 
 def printLine():
-    print "+-----------+---------------------+---------------------+--------+"
+    print "+-----------+---------------------+---------------------+--------+--------+"
 
 printLine()
-print "| {:<10}| {:<20}| {:<20}| {:<7}|".format("Position", "Name", "Club", "Points")
+print u'| {:<10}| {:<20}| {:<20}| {:<7}| {:<7}|'.format("Position", "Name", "Club", "Points", u"\u2191\u2193")
 printLine()
 for player in players:
-    print u'| {:<10}| {:<20}| {:<20}| {:<7}|'.format(positions[int(player[3])], player[2].title(), player[4].title(), format(player[5], ".2f"))
+    print u'| {:<10}| {:<20}| {:<20}| {:<7}| {:<7}|'.format(positions[int(player[3])], player[2].title(), player[4].title(), format(player[5], ".2f"), format(player[6], ".2f"))
 printLine()
 print "Spent Cartoletas: " + format(spentMoney, ".2f")
 print "Expected Points:  " + format(spectedPoints, ".2f")

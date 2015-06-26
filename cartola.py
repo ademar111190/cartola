@@ -1,21 +1,29 @@
 #!/usr/bin/python2.7
 
+from sys import argv
 from json import loads
 from os.path import isfile
 from sqlite3 import connect
 from getpass import getpass
 from mechanize import Browser
 from optparse import OptionParser
+from collections import OrderedDict
 
-def parseOptionFormation(option, opt, value, parser):
+def parseRemovePlayers(option, opt, value, parser):
     setattr(parser.values, option.dest, [int(i) for i in value.split(',')])
+
+def parseTeams(option, opt, value, parser):
+    setattr(parser.values, option.dest, [i for i in value.split(',')])
 
 parser = OptionParser()
 parser.add_option("-u", "--user", dest="user", type="string", help="the cartola username, e.g. -u ademar@mail.com")
 parser.add_option("-c", "--maxCartoletas", dest="maxMoney", type="float", help="the max money (cartoletas) allowed to be spent, e.g. -c 100.0")
 parser.add_option("-m", "--minValorization", dest="minValorization", type="float", help="the min valorization, e.g. -m -0.4")
 parser.add_option("-M", "--maxValorization", dest="maxValorization", type="float", help="the max valorization, e.g. -M 0.5")
-parser.add_option("-f", "--formation", action="callback", type="string", help="the allowed formations, e.g. -f 442,433", callback=parseOptionFormation)
+parser.add_option("-f", "--forceFormation", dest="forceFormation", type="int", help="force a formation, e.g. -f 442")
+parser.add_option("-r", "--removePlayers", action="callback", type="string", help="remove these players, e.g. -r 12345,67890", callback=parseRemovePlayers)
+parser.add_option("-t", "--removeTeams", action="callback", type="string", help="remove these teams, e.g. -t \"Barcelona,Real Madrid\"", callback=parseTeams)
+parser.add_option("-T", "--forceTeams", action="callback", type="string", help="force these teams, e.g. -T \"Barcelona,Real Madrid\"", callback=parseTeams)
 (options, args) = parser.parse_args()
 
 needCreateDb = not isfile("cartola.db")
@@ -128,74 +136,102 @@ formations =  { 343 : [1, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 6], \
                 451 : [1, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 6], \
                 532 : [1, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 6], \
                 541 : [1, 2, 2, 3, 3, 3, 4, 4, 4, 4, 5, 6], }
-allowedFormations = []
-if (options.formation is None):
-    allowedFormations.extend(formations.values())
-else:
-    for f in options.formation:
-        allowedFormations.append(formations[f])
 
-def allowedPositionsForAlreadySelectedPlayers(players):
-    positionsCount = { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 }
-    for player in players:
-        positionsCount[player[3]] = positionsCount[player[3]] + 1
-    stillAllowedFormations = []
-    for allowedFormation in allowedFormations:
-        allowed = True
-        for key, value in positionsCount.iteritems():
-            if (allowedFormation.count(key) < value):
-                allowed = False
-                break
-        if (allowed):
-            stillAllowedFormations.append(allowedFormation)
-    allowedPositions = []
-    for allowedFormation in stillAllowedFormations:
-        for key, value in positionsCount.iteritems():
-            if (key not in allowedPositions and allowedFormation.count(key) > value):
-                allowedPositions.append(key)
-    return allowedPositions
+playersComparation = {}
+moneysComparation = {}
+pointsComparation = {}
 
-def listToInSql(list):
-    return str(list).replace("[","(").replace("]",")")
+if (options.forceFormation):
+    key = options.forceFormation
+    formations = { key : formations[key] }
 
-connection = connect("cartola.db")
-cursor = connection.cursor()
+for k,v in formations.iteritems():
+    allowedFormations = [v]
 
-spentMoney = 0.0
-spectedPoints = 0.0
-players = []
-for i in range(playersNeeded):
-    maxMoneyRule = ""
-    if options.maxMoney is not None:
-        avaliableMoney = options.maxMoney - spentMoney if options.maxMoney is not None else 9999.9
-        currentMaxMoneyForPlayer = avaliableMoney / float(playersNeeded - i)
-        maxMoneyRule = " AND player.price <= " + str(currentMaxMoneyForPlayer)
-    cursor.execute('''  SELECT player.id, player.price, player.name, player.position, player.club, projection.score, projection.valorization
-                        FROM player JOIN projection ON player.id = projection.id
-                        WHERE player.id NOT IN {0} AND player.position IN {1} {2} {3} {4}
-                        ORDER BY projection.score DESC;
-                        '''.format(listToInSql([player[0] for player in players]), \
-                                    listToInSql(allowedPositionsForAlreadySelectedPlayers(players)), \
-                                    maxMoneyRule, \
-                                    "" if options.minValorization == None else " AND projection.valorization > " + str(options.minValorization), \
-                                    "" if options.maxValorization == None else " AND projection.valorization < " + str(options.maxValorization)))
-    player = cursor.fetchone()
-    spentMoney = spentMoney + float(player[1])
-    spectedPoints = spectedPoints + player[5]
-    players.append(player)
-players.sort(key = lambda player: player[3])
+    def allowedPositionsForAlreadySelectedPlayers(players):
+        positionsCount = { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 }
+        for player in players:
+            positionsCount[player[3]] = positionsCount[player[3]] + 1
+        stillAllowedFormations = []
+        for allowedFormation in allowedFormations:
+            allowed = True
+            for key, value in positionsCount.iteritems():
+                if (allowedFormation.count(key) < value):
+                    allowed = False
+                    break
+            if (allowed):
+                stillAllowedFormations.append(allowedFormation)
+        allowedPositions = []
+        for allowedFormation in stillAllowedFormations:
+            for key, value in positionsCount.iteritems():
+                if (key not in allowedPositions and allowedFormation.count(key) > value):
+                    allowedPositions.append(key)
+        return allowedPositions
+
+    connection = connect("cartola.db")
+    cursor = connection.cursor()
+
+    spentMoney = 0.0
+    expectedPoints = 0.0
+    players = []
+    for i in range(playersNeeded):
+        maxMoneyRule = ""
+        if options.maxMoney is not None:
+            avaliableMoney = options.maxMoney - spentMoney if options.maxMoney is not None else 9999.9
+            currentMaxMoneyForPlayer = avaliableMoney / float(playersNeeded - i)
+            maxMoneyRule = " AND player.price <= " + str(currentMaxMoneyForPlayer)
+        forbiddenPlayers = [player[0] for player in players]
+        if (options.removePlayers is not None):
+            forbiddenPlayers.extend(options.removePlayers)
+        removeTeamsRule = "" if options.removeTeams == None else " AND LOWER(player.club) NOT IN ('{0}')".format("','".join([t.lower() for t in options.removeTeams]))
+        forceTeamsRule = "" if options.forceTeams == None else " AND LOWER(player.club) IN ('{0}')".format("','".join([t.lower() for t in options.forceTeams]))
+        query = ''' SELECT player.id, player.price, player.name, player.position, player.club, projection.score, projection.valorization
+                            FROM player JOIN projection ON player.id = projection.id
+                            WHERE player.id NOT IN ({0}) AND player.position IN ({1}) {2} {3} {4} {5} {6}
+                            ORDER BY projection.score DESC;
+                            '''.format(",".join([str(p) for p in forbiddenPlayers]), \
+                                        ",".join([str(p) for p in allowedPositionsForAlreadySelectedPlayers(players)]), \
+                                        removeTeamsRule, \
+                                        forceTeamsRule, \
+                                        maxMoneyRule, \
+                                        "" if options.minValorization == None else " AND projection.valorization > " + str(options.minValorization), \
+                                        "" if options.maxValorization == None else " AND projection.valorization < " + str(options.maxValorization))
+        cursor.execute(query)
+        player = cursor.fetchone()
+        spentMoney = spentMoney + float(player[1])
+        expectedPoints = expectedPoints + player[5]
+        players.append(player)
+    players.sort(key = lambda player: player[3])
+    playersComparation[k] = players
+    moneysComparation[k] = spentMoney
+    pointsComparation[k] = expectedPoints
+
+orderedPoints = OrderedDict(sorted(pointsComparation.items(), key=lambda x: x[1]))
 
 def printLine():
-    print "+-----------+---------------------+---------------------+--------+--------+"
+    print "+-----+--------+--------+"
 
 printLine()
-print u'| {:<10}| {:<20}| {:<20}| {:<7}| {:<7}|'.format("Position", "Name", "Club", "Points", u"\u2191\u2193")
+print u'| {:<4}|{:>7} |{:>7} |'.format("", "Points", "$")
+printLine()
+bestFormation = None
+for k,v in orderedPoints.iteritems():
+    bestFormation = k
+    players = playersComparation[k]
+    spentMoney = moneysComparation[k]
+    expectedPoints = pointsComparation[k]
+    print u'| {:<4}|{:>7} |{:>7} |'.format(k, format(expectedPoints, ".2f"), format(spentMoney, ".2f"))
+printLine()
+
+def printLine():
+    print "+-----+-------+---------------------+---------------+--------+--------+"
+
+printLine()
+print u'| {:<4}| {:<6}| {:<20}| {:<14}|{:>7} |{:>7} |'.format(bestFormation, "ID", "Name", "Club", "Points", u"\u2191\u2193")
 printLine()
 for player in players:
-    print u'| {:<10}| {:<20}| {:<20}| {:<7}| {:<7}|'.format(positions[int(player[3])], player[2].title(), player[4].title(), format(player[5], ".2f"), format(player[6], ".2f"))
+    print u'| {:<4}| {:<6}| {:<20}| {:<14}|{:>7} |{:>7} |'.format(positions[int(player[3])], player[0], player[2].title(), player[4].title(), format(player[5], ".2f"), format(player[6], ".2f"))
 printLine()
-print "Spent Cartoletas: " + format(spentMoney, ".2f")
-print "Expected Points:  " + format(spectedPoints, ".2f")
 
 connection.commit()
 connection.close()

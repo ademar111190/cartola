@@ -61,7 +61,7 @@ def main():
     print("Getting results")
     results = [[athlete, prediction] for athlete, prediction in zip(athletes, predictions)]
     results.sort(key=lambda x: -x[1])
-    print("\"Scale\",\"Name\",\"Team\",\"Position\",\"Status\",\"Prediction\"")
+    print("\"Scale\",\"Name\",\"Team\",\"Position\",\"Status\",\"Price\",\"Prediction\"")
     for result in results:
         athlete = result[0]
         prediction = result[1]
@@ -74,6 +74,7 @@ def main():
               athlete.club.name + "\",\"" +
               str(athlete.position.name) + "\",\"" +
               str(athlete.status.name) + "\"," +
+              str(athlete.price) + "," +
               str(prediction))
 
     print("Done")

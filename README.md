@@ -57,7 +57,8 @@ Below the Getting results line we have a CSV of all players score prediction sor
 - Team: The athlete team
 - Position: The athlete position
 - Status: The athlete status
-- Prediction: The score projection
+- Price: The athlete price
+- Prediction: The algorithm score to the player 
 
 # Customization
 

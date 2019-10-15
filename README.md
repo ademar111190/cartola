@@ -5,11 +5,7 @@ Just a study script to help Cartola lineup.
 # How to
 
 1. Install `Python3` if it is not already installed 
-1. Install requests `pip3 install requests`
-1. Install sklearn `pip3 install sklearn`
-1. Install numpy `pip3 install numpy`
-1. Install scipy `pip3 install scipy`
-1. Install gplearn `pip3 install gplearn`
+1. Install dependencies `pip3 install -r requirements.txt`
 1. Add execution permission to Main file `chmod +x Main.py`
 1. Create on the root folder a file `config.txt` with your cartola username and password as a follow:
 

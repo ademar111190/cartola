@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from gplearn.genetic import SymbolicRegressor
 
 from Auth import get_auth
-from Athlete import get_athletes
 from Enums import Status
 from Enums import Position
-from Team import get_teams
-from gplearn.genetic import SymbolicRegressor
+from models import Score
+from clients import get_athletes, get_teams
 
 
 def main():

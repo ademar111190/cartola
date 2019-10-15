@@ -1,0 +1,5 @@
+requests==2.22.0
+sklearn
+numpy
+scipy
+gplearn

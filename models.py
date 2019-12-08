@@ -1,19 +1,23 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import requests
 import json
+
 from Enums import Position
 from Enums import Status
-from Score import Score
 
 
-def get_athletes(teams):
-    response = requests.get("https://api.cartolafc.globo.com/atletas/mercado")
-    athletes = json.loads(response.content)
-    athletes = athletes["atletas"]
-    athletes = [Athlete(athlete, teams) for athlete in athletes]
-    return athletes
+class Team:
+    def __init__(self, args):
+        self.id = int(args["id"])
+        self.name = str(args["nome"])
+        self.nick = str(args["abreviacao"])
+        self.position = int(args["posicao"] if "posicao" in args else -1)
+
+
+class Score:
+    def __init__(self, args):
+        self.turn = int(args["rodada_id"])
+        self.point = float(args["pontos"])
+        self.average = float(args["media"])
 
 
 class Athlete:
